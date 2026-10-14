@@ -1,0 +1,95 @@
+// Copyright © 2026 Petr Panteleyev
+// SPDX-License-Identifier: BSD-2-Clause
+package org.panteleyev.xml;
+
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class ConverterTest {
+
+    private static List<Arguments> testStringToValueArguments() {
+        return List.of(
+                Arguments.of(
+                        "true", Boolean.class, true, false
+                ),
+                Arguments.of(
+                        "string", String.class, "string", false
+                ),
+                Arguments.of(
+                        "100", Integer.class, 100, false
+                ),
+                Arguments.of(
+                        "100", Long.class, 100L, false
+                ),
+                Arguments.of(
+                        "100", Double.class, 100.0, false
+                ),
+                Arguments.of(
+                        "2024-12-11T01:02:03", LocalDateTime.class, LocalDateTime.of(2024, 12, 11, 1, 2, 3), false
+                ),
+                Arguments.of(
+                        "2024-12-11", LocalDate.class, LocalDate.of(2024, 12, 11), false
+                ),
+                Arguments.of(
+                        "20068", LocalDate.class, LocalDate.of(2024, 12, 11), true
+                )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("testStringToValueArguments")
+    public void testStringToValue(String text, Class<?> type, Object expected, boolean localDateAsEpochDay) {
+        var actual = Converter.stringToValue(type, text, localDateAsEpochDay);
+        assertEquals(expected, actual.orElseThrow());
+    }
+
+    @ParameterizedTest
+    @ValueSource(classes = {
+            Integer.class, Long.class, Boolean.class, BigDecimal.class, String.class,
+            UUID.class, LocalDate.class, LocalDateTime.class
+    })
+    public void testEmptyString(Class<?> type) {
+        var actual = Converter.stringToValue(type, "", false);
+        if (Objects.equals(type, String.class)) {
+            assertEquals("", actual.orElseThrow());
+        } else {
+            assertTrue(actual.isEmpty());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testToAndFrom(boolean localDateAsEpochDay) {
+        var values = List.of(
+                100, 100L, BigDecimal.TEN, "string",
+                LocalDateTime.of(2024, 12, 11, 1, 2, 3),
+                LocalDate.of(2024, 12, 11),
+                UUID.randomUUID(),
+                new byte[]{1, 2, 3}
+        );
+
+        for (var originalValue : values) {
+            var stringValue = Converter.valueToString(originalValue, localDateAsEpochDay);
+            var restored = Converter.stringToValue(originalValue.getClass(), stringValue, localDateAsEpochDay);
+
+            if (originalValue.getClass().isArray()) {
+                assertArrayEquals((byte[]) originalValue, (byte[]) restored.orElseThrow());
+            } else {
+                assertEquals(originalValue, restored.orElseThrow());
+            }
+        }
+    }
+}
